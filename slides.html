@@ -6,10 +6,12 @@
 <script src="site_libs/quarto-html/tippy.umd.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
 <link href="site_libs/quarto-html/light-border.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-c8ad9e5dbd60b7b70b38521ab19b7da4.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-befe23ebd2f54d8af2c8a89d1a1611f1.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
   <meta name="generator" content="quarto-1.7.34">
 
-  <title>My Talk</title>
+  <meta name="author" content="Author: Ali Javani">
+  <meta name="dcterms.date" content="2025-01-09">
+  <title>PicoCal Autoencoder</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -28,7 +30,7 @@
       vertical-align: middle;
     }
   </style>
-  <link rel="stylesheet" href="site_libs/revealjs/dist/theme/quarto-f563837468303362081e247dddd440d0.css">
+  <link rel="stylesheet" href="site_libs/revealjs/dist/theme/quarto-175ec1c0ea92bc532c45781632c4e35e.css">
   <link href="site_libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
   <link href="site_libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
   <link href="site_libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
@@ -121,29 +123,385 @@
     }
   </style>
 </head>
-<body class="quarto-light">
+<body class="quarto-dark">
   <div class="reveal">
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">My Talk</h1>
+  <h1 class="title">PicoCal Autoencoder</h1>
+  <p class="subtitle"><strong>Supervisors:</strong> Vladimir Loncar</p>
 
 <div class="quarto-title-authors">
+<div class="quarto-title-author">
+<div class="quarto-title-author-name">
+<strong>Author:</strong> Ali Javani 
+</div>
+</div>
 </div>
 
+  <p class="date">2025-01-09</p>
 </section>
-<section id="welcome" class="slide level2">
-<h2>Welcome</h2>
+<section>
+<section id="project-overview" class="title-slide slide level1 center">
+<h1>Project overview</h1>
+<p>The model compresses and reconstructs the pulses measured in the <strong>PicoCal</strong> calorimeter. Each pulse is normally stored as <strong>32 samples</strong> (already downsampled from a longer waveform). Transmitting and saving all of this is challenging because the detector will record <strong>millions of pulses per second</strong>.</p>
+</section>
+<section class="slide level2">
+
+<p>Our <strong>autoencoder</strong> takes each 32-point pulse and compresses it to a <strong>2-dimensional latent</strong>. These two numbers capture key features (size, shape, timing). The <strong>encoder</strong> runs <strong>on-detector</strong> so only the compressed representation is transmitted; the <strong>decoder</strong> reconstructs the full 32-sample pulse downstream.</p>
+</section>
+<section class="slide level2">
+
+<p>Compared with simpler methods that keep only a timestamp, this preserves much more information about the <strong>pulse shape</strong>, improving:</p>
 <ul>
-<li>Quarto + reveal.js on GitHub Pages 🚀</li>
+<li><strong>Time reconstruction:</strong> precise hit timing.</li>
+<li><strong>Energy calibration:</strong> mapping the wave amplitude to deposited energy.</li>
+<li><strong>Pile-up mitigation:</strong> separating overlapping signals.</li>
 </ul>
+</section></section>
+<section>
+<section id="what-is-an-autoencoder" class="title-slide slide level1 center">
+<h1>What is an Autoencoder?</h1>
+<p>An autoencoder learns a compact representation (<strong>encoder</strong>) and a reconstruction (<strong>decoder</strong>).</p>
+<p>Our baseline: <strong>32 → 2 → 32</strong> (encoder → bottleneck → decoder). The encoder is the on-detector component; the decoder is offline.</p>
+<p>So, the bottleneck would retain most of the information</p>
+</section>
+<section class="slide level2">
+
+
+<img data-src="assets/images/autoencoder.png" class="r-stretch"></section></section>
+<section>
+<section id="data-used-for-training" class="title-slide slide level1 center">
+<h1>Data used for training</h1>
+<p>Training and testing data come from a detailed simulation of the PicoCal electromagnetic calorimeter, including the detector geometry, materials, and readout electronics, so simulated pulses resemble those expected during LHCb data-taking.</p>
+</section>
+<section class="slide level2">
+
+<p>We generate two pulse types and then mix them to mimic realistic running conditions:</p>
+<ul>
+<li><strong>Signal pulses:</strong> single photons, 0.5–5 GeV, produced near the interaction point.</li>
+<li><strong>Background pulses:</strong> extra detector activity (for example: pile-up, underlying event).</li>
+</ul>
+<p>Each pulse is first simulated with <strong>1024 samples</strong> (as in the actual test-beam digitizer). The detector will use a different digitizer with <strong>32 samples</strong>, so we <strong>downsample</strong> 1024→32 to match. This preserves overall shape but not exact timing.</p>
+</section></section>
+<section>
+<section id="current-status-work-done-so-far" class="title-slide slide level1 center">
+<h1>Current status (work done so far)</h1>
+<ul>
+<li>A baseline autoencoder is <strong>trained</strong>.</li>
+<li>An <strong>hls4ml</strong> implementation exists for <strong>hardware deployment</strong> of the encoder.</li>
+</ul>
+</section>
+<section id="what-i-am-going-to-do" class="slide level2">
+<h2>What I am going to do</h2>
+<p>Optimize the model via <strong>quantization</strong>, focusing on the <strong>encoder</strong>.</p>
+</section></section>
+<section id="why-we-need-quantize" class="title-slide slide level1 center">
+<h1>Why we need quantize? <!--(confirm priorities with Katya???)--></h1>
+<ul>
+<li><strong>Smaller &amp; cheaper:</strong> fewer bits → less memory and bandwidth per pulse.</li>
+<li><strong>Faster &amp; lower latency:</strong> integer arithmetic is hardware-friendly.</li>
+<li><strong>Lower power:</strong> critical for on-detector operation.</li>
+<li><strong>Robustness:</strong> with <strong>QAT</strong>, accuracy can match (or sometimes slightly improve vs.&nbsp;FP) due to regularization.</li>
+<li><strong>Smaller output payload:</strong> compressed latent uses fewer bits per value.</li>
+</ul>
+</section>
+
+<section id="quantization-options-summary" class="title-slide slide level1 center">
+<h1>Quantization options (summary)</h1>
+<div class="slide" style="font-size:50%">
+<table class="caption-top">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>What it does</th>
+<th>Accuracy hit</th>
+<th>Speed/Memory win</th>
+<th>Typical use cases</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>PTQ (static)</strong></td>
+<td>Calibrate on a small dataset; bake fixed scales/zero-points.</td>
+<td>Low→moderate (good at 8-bit; riskier ≤4-bit)</td>
+<td>3–4× smaller; fast INT kernels</td>
+<td>Quick CPU/GPU/TPU deploy when retraining is hard.</td>
+</tr>
+<tr class="even">
+<td><strong>PTQ (dynamic)</strong></td>
+<td>Weights quantized; activation scales computed at inference.</td>
+<td>Similar to static at 8-bit; worse ≤4-bit</td>
+<td>Memory win; smaller speedup</td>
+<td>NLP on CPUs; no calibration set available.</td>
+</tr>
+<tr class="odd">
+<td><strong>QAT</strong></td>
+<td>Train with fake-quant (STE) so model learns quant noise.</td>
+<td>Best (works down to 4/2-bit; even ternary)</td>
+<td>Runtime like PTQ; higher train cost</td>
+<td>Edge/FPGA/ASIC; tight accuracy budgets.</td>
+</tr>
+<tr class="even">
+<td><strong>WOQ</strong></td>
+<td>Weight-only (e.g., 4-bit); activations FP8/16.</td>
+<td>Small→moderate</td>
+<td>Big memory/BW savings</td>
+<td>Large LLM/CV on GPUs where memory is the bottleneck.</td>
+</tr>
+<tr class="odd">
+<td><strong>Mixed-precision</strong></td>
+<td>Per-layer/per-tensor bit-widths.</td>
+<td>Near-float if tuned</td>
+<td>Best Pareto trade-off</td>
+<td>FPGAs/ASICs (QKeras+hls4ml), mobile SoCs.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="slide" style="font-size:70%">
+<p>Our plan: <strong>Mixed-precision QAT</strong> for the encoder. (using <strong>QKeras + hls4ml</strong>)</p>
+</div>
+</section>
+
+<section id="qkeras-hls4ml" class="title-slide slide level1 center">
+<h1>QKeras + hls4ml</h1>
+<p><strong>QKeras is</strong> a drop-in extension of Keras that lets you assign <strong>per-layer</strong> (heterogeneous) quantization to weights, activations, and batch-norm parameters and train the model <strong>quantization-aware</strong>. Combined with <strong>hls4ml</strong>, quantized networks are compiled to FPGA firmware for <strong>O(10) ns</strong> inference.</p>
+</section>
+
+<section id="why-im-not-using-autoqkeras" class="title-slide slide level1 center">
+<h1>Why I’m not using AutoQKeras</h1>
+<ul>
+<li><strong>AutoQKeras</strong> (auto search over bit-widths based on estimated energy or model bit size + accuracy) was <strong>not used</strong> due to:
+<ul>
+<li>Sparse docs/API; heavy implicit behavior.</li>
+<li>Minimal result summaries and limited reliability for our workflow.</li>
+<li>No built-in <strong>K-Fold</strong> support;</li>
+<li>limited parallelism beyond default Keras options (except Trial parallelism, Data parallelism only suitable for multiple GPUs)</li>
+</ul></li>
+</ul>
+</section>
+
+<section>
+<section id="environment-constraints-what-currently-works" class="title-slide slide level1 center">
+<h1>Environment constraints (what currently works)</h1>
+<div class="slide" style="font-size:70%">
+<ul>
+<li>QKeras works reliably with <strong><code>Python 3.10</code> + <code>TensorFlow 2.14</code> + <code>Keras 2.x</code></strong> in our tests.</li>
+<li><strong>Keras v3</strong> APIs are not compatible (errors encountered). There are signs of in-progress support, but it is not usable in our setup yet and updates are so rare.</li>
+<li>CUDA/driver combinations: in practice, the project failed with some versions (e.g., ~560, ~580) and ran with an intermediate one (~570) but again, in theory it should be compatible with 570 ≤.</li>
+<li>Although some guides suggest <strong><code>TF 2.15</code></strong> (<code>Keras 2.15</code>) or <strong><code>TF ≥ 2.16</code> with <code>tf-keras</code> and <code>TF_USE_LEGACY_KERAS=1</code></strong>, this did not work in our experiments. We therefore <strong>stuck to <code>Python 3.10</code> + <code>TF 2.14</code></strong>.</li>
+</ul>
+</div>
+</section>
+<section class="slide level2">
+
+<p><em>Note:</em> I plan to create a short <strong>notebook/markdown guide</strong> for a reproducible QKeras setup (including CERN cluster tips), given the current documentation gaps and the fact that it took a lot of time on setting up a working environment for me.</p>
+</section></section>
+<section>
+<section id="quantization-work-so-far-issues-and-fixes" class="title-slide slide level1 center">
+<h1>Quantization work so far — issues and fixes</h1>
+
+</section>
+<section id="wrong-baseline-comparison-fixed" class="slide level2">
+<h2>Wrong baseline comparison (fixed)</h2>
+<p>Initially, the quantized model was asked to reconstruct <strong>unquantized</strong> inputs; this implicitly asks it to “undo” input quantization too.</p>
+<p>TODO: show the previous code for quantized model and focus on the line with activation before the model</p>
+<p><strong>Fix:</strong> <strong>Quantize the inputs</strong> (data) prior to training so both models see consistent quantization.</p>
+</section>
+<section id="dying-relu-diagnosis-fixed" class="slide level2">
+<h2>“dying ReLU” diagnosis (fixed)</h2>
+<p><strong>Intermittent failures (~1/3 runs).</strong></p>
+<p>Even after fixing the inputs, about <strong>one-third of runs</strong> failed to learn. Inspection of <strong>weights and biases</strong> showed nothing obviously wrong, yet parameter updates were <strong>tiny or stagnant</strong> across batches/epochs. Probing intermediate <strong>layer outputs</strong> revealed the network was producing <strong>near-constant outputs</strong>, and, crucially, the <strong>encoder ReLU</strong> had a <strong>very high (sometimes ~100%) probability</strong> of outputting <strong>zero</strong> on one or both latent units.</p>
+</section>
+<section class="slide level2">
+
+<p><strong>Root cause: ReLU + tiny bottleneck → dead units.</strong></p>
+<p>With an activation that has an <strong>asymmetric output</strong> (ReLU = zero for all negative pre-activations) and a <strong>bottleneck with very few neurons (latent=2)</strong>, the model often explores <strong>zero outputs</strong> early—before the optimizer is “calibrated.” Once a ReLU unit is stuck at zero, its <strong>gradient is zero</strong> and it cannot recover. This is the <strong>dying ReLU</strong> problem: ReLU neurons become permanently inactive, outputting zero for all inputs and <strong>blocking learning</strong>.</p>
+</section>
+<section class="slide level2">
+
+<ul>
+<li>See: <strong>Against Dead ReLU</strong> (internal note): https://www.notion.so/Against-Dead-Relu-262d089371c98046ae45ddd100d6a2ec?pvs=21</li>
+</ul>
+<p><strong>Mitigations explored (and what actually worked).</strong></p>
+<ul>
+<li><p><strong>Initialization:</strong> Use <strong>He (Kaiming) initialization</strong> instead of Xavier for rectifiers.</p>
+<pre><code>@misc{he2015delvingdeeprectifierssurpassing,
+  title={Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification},
+  author={Kaiming He and Xiangyu Zhang and Shaoqing Ren and Jian Sun},
+  year={2015},
+  eprint={1502.01852},
+  archivePrefix={arXiv},
+  primaryClass={cs.CV},
+  url={https://arxiv.org/abs/1502.01852},
+}
+</code></pre></li>
+</ul>
+</section>
+<section class="slide level2">
+
+<ul>
+<li><p><strong>Normalization:</strong> Some papers suggest placing <strong>Batch Normalization immediately before the activation</strong> (notably in larger models) to stabilize pre-activations.</p>
+<pre><code>@article{DBLP:journals/corr/IoffeS15,
+  author       = {Sergey Ioffe and Christian Szegedy},
+  title        = {Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift},
+  journal      = {CoRR},
+  volume       = {abs/1502.03167},
+  year         = {2015},
+  url          = {http://arxiv.org/abs/1502.03167},
+  eprinttype   = {arXiv},
+  eprint       = {1502.03167}
+}
+</code></pre></li>
+</ul>
+</section>
+<section class="slide level2">
+
+<ul>
+<li><strong>Activation variants:</strong> Many works propose <strong>ReLU extensions</strong> (e.g., <strong>Leaky ReLU / PReLU / RReLU</strong>) that keep a <strong>non-zero slope</strong> on the negative side, both <strong>mitigating dead units</strong> and sometimes <strong>improving accuracy</strong>.</li>
+</ul>
+</section>
+<section class="slide level2">
+
+<ul>
+<li><p><strong>Regularization for quantization robustness:</strong> One paper recommends <strong>L2 regularization</strong> in quantization-friendly designs for large models—shrinking weight ranges to <strong>reduce quantization error</strong>, which in turn lowers the chance of saturating activations and <strong>killing neurons</strong>:</p>
+<pre><code>@inproceedings{Sheng_2018,
+  title={A Quantization-Friendly Separable Convolution for MobileNets},
+  url={http://dx.doi.org/10.1109/EMC2.2018.00011},
+  DOI={10.1109/emc2.2018.00011},
+  booktitle={2018 1st Workshop on Energy Efficient Machine Learning and Cognitive Computing for Embedded Applications (EMC2)},
+  publisher={IEEE},
+  author={Sheng, Tao and Feng, Chen and Zhuo, Shaojie and Zhang, Xiaopeng and Shen, Liang and Aleksic, Mickey},
+  year={2018},
+  month=mar
+}
+</code></pre></li>
+</ul>
+</section>
+<section class="slide level2">
+
+<ul>
+<li><strong>Learning rate:</strong> A <strong>large LR</strong> increases the chance of pushing units into the zero region. I <strong>tuned the LR</strong>, added <strong>warmup</strong>, and experimented with <strong>restarts</strong>; these helped but <strong>did not</strong> fully resolve the issue.</li>
+</ul>
+</section>
+<section class="slide level2">
+
+<p><strong>Outcome.</strong></p>
+<p>The <strong>only change that consistently fixed the problem</strong> was <strong>replacing ReLU with Leaky ReLU</strong> in the encoder bottleneck. Other mitigations (He init, BN placement, L2, LR schedules) <strong>did not</strong> noticeably alleviate the issue in our <strong>small</strong> model, likely because many of those results are demonstrated on <strong>larger architectures</strong>.</p>
+</section>
+<section class="slide level2">
+
+<p><strong>Operational safeguard.</strong></p>
+<p>I also implemented a <strong>callback</strong> to detect dying behavior (monitoring <strong>zero-output ratio</strong> and <strong>learning stalls</strong>) and to <strong>reinitialize</strong>. However, reinitializing <strong>layers/activations/callbacks/epochs mid-training</strong> made the code overly complex. Instead, I adopted a simpler <strong>restart policy</strong> triggered by <strong>high validation loss</strong>, which works well in practice.</p>
+<blockquote>
+<p>(Slide note: include a small example where training stops due to near-zero latent outputs.)</p>
+</blockquote>
+</section></section>
+<section id="variance-across-runs-and-k-fold-cross-validation" class="title-slide slide level1 center">
+<h1>Variance across runs and K-Fold cross-validation</h1>
+<div class="slide" style="font-size:70%">
+<p>The <strong>std</strong> of the <strong>minimum validation loss</strong> was high (≈ half the mean). To obtain a more stable estimate:</p>
+<ul>
+<li>Used <strong>K-Fold CV (K=10)</strong> to report an average with variance.</li>
+<li>Sequential training became slow; tried multiprocessing with shared GPU but ran into errors.</li>
+<li>Switched to a clearer approach using <strong><code>subprocess.Popen</code></strong> to launch independent training processes, reschedule failures, and keep the parallelism logic outside the training code.</li>
+</ul>
+<p><em>(Include a small <code>subprocess.Popen</code> snippet on the slide if you want to show the launch pattern.)</em></p>
+</div>
+</section>
+
+<section id="what-to-optimize-next-and-why" class="title-slide slide level1 center">
+<h1>What to optimize next (and why)</h1>
+<div class="slide" style="font-size:70%">
+<ul>
+<li><strong># encoder layers:</strong> adding encoder depth doubles on-detector latency; avoid unless justified.</li>
+<li><strong># decoder layers:</strong> can be increased (offline) to improve reconstruction and better expose the bottleneck capacity.</li>
+<li><strong>Quantizing encoder weights/biases:</strong> evaluate experimentally (likely symmetric per-channel weights; higher-precision biases).</li>
+<li><strong>Quantizing encoder output activation:</strong> evaluate carefully (see §13).</li>
+<li><strong>Latent dimensionality:</strong> we tested 2→5 for insight; <strong>spec requires 2</strong>, so we will stick to 2.</li>
+</ul>
+</div>
+</section>
+
+<section>
+<section id="parameter-ranges-and-early-experiments" class="title-slide slide level1 scrollable center">
+<h1>Parameter ranges and early experiments</h1>
+<ul>
+<li><strong>Weights/biases:</strong> observed magnitudes are small; <strong>integer bits 0–2</strong> seem sufficient. With <strong>10–15 fractional bits</strong>, quantization error is well below the model’s validation loss per parameter.</li>
+</ul>
+<blockquote>
+<p>add the based model results</p>
+</blockquote>
+</section>
+<section class="slide level2">
+
+<ul>
+<li><strong>Activations Outputs:</strong> much <strong>wider dynamic range</strong>; they need more integer bits, making them harder to quantize aggressively.</li>
+</ul>
+<blockquote>
+<p>add outputs</p>
+</blockquote>
+</section>
+<section class="slide level2">
+
+<p>Experiments:</p>
+<ul>
+<li>Quantizing <strong>only the encoder output activation</strong> gave inconsistent results (sensitive/random).</li>
+</ul>
+<blockquote>
+<p>add outputs</p>
+</blockquote>
+</section>
+<section class="slide level2">
+
+<ul>
+<li>Keeping that activation <strong>unquantized</strong>, we scanned <strong>latent sizes 2–5</strong>: moving from <strong>2 → 3</strong> latents improved accuracy by ~4× with ~1.5× model/energy cost, but <strong>spec confines us to 2 latents</strong> (post-review), and gains from <strong>3→4→5</strong> were not compelling.</li>
+</ul>
+<blockquote>
+<p>add outputs</p>
+</blockquote>
+</section>
+<section class="slide level2">
+
+<p>Across runs, <strong>integer-bit = 0</strong> (i.e., all fractional) often performed best for weights/biases, matching the observed small dynamic range.</p>
+</section>
+<section class="slide level2">
+
+<p><strong>Key observation:</strong> Although run-to-run variance is high, <strong>train and validation losses closely track</strong>, especially at the end. The decoder has ~<strong>2 KB</strong> of parameters vs.&nbsp;~<strong>100 MB</strong> of data, so the model capacity is too small to overfit; <em>low MSE loss</em> typically reflects genuine difficulty, not overfitting.</p>
+<blockquote>
+<p>add outputs</p>
+</blockquote>
+</section>
+<section class="slide level2">
+
+<p><strong>Implication for production:</strong> choose a reasonable configuration and <strong>rerun with new initializations</strong> until the desired metric is achieved. Under this regime, we can also quantize the encoder activation more aggressively.</p>
+</section></section>
+<section id="recommendations-to-the-new-qkeras-replacing-of-cern-developer-feedback" class="title-slide slide level1 center">
+<h1>Recommendations to the new QKeras replacing of CERN (developer feedback)</h1>
+<div class="slide" style="font-size:70%">
+<ul>
+<li>Add <strong>LeakyReLU-family</strong> activations support; they help both small and large models and drastically reduce dead-unit risk.</li>
+<li>Prefer <strong>explicit</strong> over implicit implementation behavior and make implicit functionalities like auto quantization one top of them.</li>
+<li>Move away from <strong>string-based</strong> quantizer specs; adopt Pythonic APIs (with deprecation warnings).</li>
+<li>Consider <strong>drop-in PyTorch-layer equivalents</strong> for broader adoption.</li>
+</ul>
+</div>
 
 
 </section>
     </div>
   <div class="quarto-auto-generated-content" style="display: none;">
+<p><img src="assets/images/cern-logo.png" class="slide-logo"></p>
 <div class="footer footer-default">
-
+<p>Ali Javani - Summer Student 2025 - PicoCal Autoencoder Optimization - 02.09.2025</p>
 </div>
 </div></div>
 
@@ -168,8 +526,8 @@
       // Full list of configuration options available at:
       // https://revealjs.com/config/
       Reveal.initialize({
-'controlsAuto': true,
-'previewLinksAuto': false,
+'controlsAuto': false,
+'previewLinksAuto': true,
 'pdfSeparateFragments': false,
 'autoAnimateEasing': "ease",
 'autoAnimateDuration': 1,
@@ -179,7 +537,7 @@
 'smaller': false,
  
         // Display controls in the bottom right corner
-        controls: false,
+        controls: true,
 
         // Help the user learn the controls by providing hints, for example by
         // bouncing the down arrow when they first encounter a vertical slide
@@ -196,7 +554,7 @@
         progress: true,
 
         // Display the page number of the current slide
-        slideNumber: 'c/t',
+        slideNumber: 'h.v',
 
         // 'all', 'print', or 'speaker'
         showSlideNumber: 'all',
@@ -237,7 +595,7 @@
         rtl: false,
 
         // see https://revealjs.com/vertical-slides/#navigation-mode
-        navigationMode: 'linear',
+        navigationMode: 'default',
 
         // Randomizes the order of slides each time the presentation loads
         shuffle: false,
@@ -301,7 +659,7 @@
         previewLinks: false,
 
         // Transition style (none/fade/slide/convex/concave/zoom)
-        transition: 'fade',
+        transition: 'slide',
 
         // Transition speed (default/fast/slow)
         transitionSpeed: 'default',
