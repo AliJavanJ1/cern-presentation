@@ -1,8 +1,9 @@
 ---
 title: "PicoCal Autoencoder"
-subtitle: "**Supervisors:** Vladimir Loncar"
-author: "**Author:** Ali Javani"
-date: "01.09.2025"
+author: "Ali Javani"
+date: "03.09.2025"
+bibliography: references.bib
+csl: assets/ieee.csl
 format:
   revealjs:
     navigation-mode: vertical   
@@ -11,15 +12,46 @@ format:
     progress: true
     hash: true
     transition: slide
-    center: false
     controls: true
     preview-links: auto
-    footer: "Ali Javani - Summer Student 2025 - PicoCal Autoencoder Optimization - 02.09.2025"
-    logo: "assets/images/cern-logo.png"
+    footer: "Ali Javani - Summer Student 2025 - PicoCal Autoencoder Optimization - 03.09.2025"
+    logo: "assets/images/cern-white.png"
+    title-slide-attributes:
+      data-visibility: "hidden"
     # fontsize: 1%
 execute:
-  echo: true # for developement
+  echo: false        # hide code by default (nice for slides)
+  warning: false
+jupyter: python3     # optional; Quarto will pick Jupyter automatically
 ---
+#
+
+<div style="text-align:center; margin-bottom:1.2rem;">
+  <h1 style="font-size: 2.3em;">PicoCal Autoencoder Optimization</h1>
+  <p><strong>Presenter:</strong> Ali Javani</p>
+  <p><strong>Supervisers:</strong> Dr. Vladimir Loncar • Prof. Eluned Smith</p>
+  <p style="font-size: .6em;"><strong>Co-Supervisors:</strong> Dr. Julian Garcia Pardinas • Dr. Katya Govorkova</p>
+</div>
+
+<div style="display:flex; justify-content:center; gap:20px">
+  <div><img src="assets/images/psl.svg" alt="Main University" style="height:70px; filter: brightness(1.5)"></div>
+  <div><img src="assets/images/cern.png" alt="Another Affiliation" style="height:70px; brightness(1.5)"></div>
+  <div><img src="assets/images/sft.png" alt="Institute of Advanced Things" style="height:70px; brightness(1.5)"></div>
+  <div><img src="assets/images/mit.png" alt="Another Affiliation" style="height:70px; brightness(1.5)"></div>
+</div>
+
+## Interactive Plotly
+
+```{python}
+import plotly.express as px
+
+iris = px.data.iris()
+fig = px.scatter(
+    iris, x="sepal_width", y="sepal_length",
+    color="species", title="Iris (interactive)"
+)
+fig  # or: fig.show()
+```
 
 # Project overview
 
@@ -100,11 +132,12 @@ Our plan: **Mixed-precision QAT** for the encoder. (using **QKeras + hls4ml**)
 
 # Why I'm not using AutoQKeras
 
-- **AutoQKeras** (auto search over bit-widths based on estimated energy or model bit size + accuracy) was **not used** due to:
-    - Sparse docs/API; heavy implicit behavior.
-    - Minimal result summaries and limited reliability for our workflow.
-    - No built-in **K-Fold** support;
-    - limited parallelism beyond default Keras options (except Trial parallelism, Data parallelism only suitable for multiple GPUs)
+**AutoQKeras** (auto search over bit-widths based on estimated energy or model bit size + accuracy) was **not used** due to:
+
+- Sparse docs/API; heavy implicit behavior.
+- Minimal result summaries and limited reliability for our workflow.
+- No built-in **K-Fold** support;
+- limited parallelism beyond default Keras options (except Trial parallelism, Data parallelism only suitable for multiple GPUs)
 
 # Environment constraints (what currently works)
 
@@ -147,38 +180,11 @@ With an activation that has an **asymmetric output** (ReLU = zero for all negati
 
 **Mitigations explored (and what actually worked).**
 
-- **Initialization:** Use **He (Kaiming) initialization** instead of Xavier for rectifiers.
+- **Initialization:** Use **He (Kaiming) initialization** instead of Xavier for rectifiers. [@he2015delvingdeeprectifierssurpassing]
     
-    ```
-    @misc{he2015delvingdeeprectifierssurpassing,
-      title={Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification},
-      author={Kaiming He and Xiangyu Zhang and Shaoqing Ren and Jian Sun},
-      year={2015},
-      eprint={1502.01852},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV},
-      url={https://arxiv.org/abs/1502.01852},
-    }
-    
-    ```
-
 ---
 
-- **Normalization:** Some papers suggest placing **Batch Normalization immediately before the activation** (notably in larger models) to stabilize pre-activations.
-    
-    ```
-    @article{DBLP:journals/corr/IoffeS15,
-      author       = {Sergey Ioffe and Christian Szegedy},
-      title        = {Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift},
-      journal      = {CoRR},
-      volume       = {abs/1502.03167},
-      year         = {2015},
-      url          = {http://arxiv.org/abs/1502.03167},
-      eprinttype   = {arXiv},
-      eprint       = {1502.03167}
-    }
-    
-    ```
+- **Normalization:** Some papers suggest placing **Batch Normalization immediately before the activation** (notably in larger models) to stabilize pre-activations. [@DBLP:journals/corr/IoffeS15]
 
 ---
 
@@ -186,21 +192,7 @@ With an activation that has an **asymmetric output** (ReLU = zero for all negati
 
 ---
 
-- **Regularization for quantization robustness:** One paper recommends **L2 regularization** in quantization-friendly designs for large models—shrinking weight ranges to **reduce quantization error**, which in turn lowers the chance of saturating activations and **killing neurons**:
-    
-    ```
-    @inproceedings{Sheng_2018,
-      title={A Quantization-Friendly Separable Convolution for MobileNets},
-      url={http://dx.doi.org/10.1109/EMC2.2018.00011},
-      DOI={10.1109/emc2.2018.00011},
-      booktitle={2018 1st Workshop on Energy Efficient Machine Learning and Cognitive Computing for Embedded Applications (EMC2)},
-      publisher={IEEE},
-      author={Sheng, Tao and Feng, Chen and Zhuo, Shaojie and Zhang, Xiaopeng and Shen, Liang and Aleksic, Mickey},
-      year={2018},
-      month=mar
-    }
-    
-    ```
+- **Regularization for quantization robustness:** One paper recommends **L2 regularization** in quantization-friendly designs for large models—shrinking weight ranges to **reduce quantization error**, which in turn lowers the chance of saturating activations and **killing neurons**: [@Sheng_2018]
 
 ---
 
@@ -295,4 +287,8 @@ Across runs, **integer-bit = 0** (i.e., all fractional) often performed best for
 - Prefer **explicit** over implicit implementation behavior and make implicit functionalities like auto quantization one top of them.
 - Move away from **string-based** quantizer specs; adopt Pythonic APIs (with deprecation warnings).
 - Consider **drop-in PyTorch-layer equivalents** for broader adoption.
+:::
+
+# References
+::: {#refs}
 :::

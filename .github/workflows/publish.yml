@@ -14,6 +14,18 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.2'
+
+      - uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: false
+
+      - run: poetry install --no-root
+
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@v2
 
