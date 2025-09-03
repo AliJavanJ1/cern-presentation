@@ -1,12 +1,5 @@
 [
   {
-    "objectID": "slides.html#interactive-plotly",
-    "href": "slides.html#interactive-plotly",
-    "title": "PicoCal Autoencoder",
-    "section": "Interactive Plotly",
-    "text": "Interactive Plotly"
-  },
-  {
     "objectID": "slides.html#what-i-am-going-to-do",
     "href": "slides.html#what-i-am-going-to-do",
     "title": "PicoCal Autoencoder",
@@ -14,11 +7,18 @@
     "text": "What I am going to do\nOptimize the model via quantization, focusing on the encoder."
   },
   {
+    "objectID": "slides.html#why-im-not-using-autoqkeras",
+    "href": "slides.html#why-im-not-using-autoqkeras",
+    "title": "PicoCal Autoencoder",
+    "section": "Why I’m not using AutoQKeras",
+    "text": "Why I’m not using AutoQKeras\nAutoQKeras (auto search over bit-widths based on estimated energy or model bit size + accuracy) was not used due to:\n\nSparse docs/API; heavy implicit behavior.\nMinimal result summaries and limited reliability for our workflow.\nNo built-in K-Fold support;\nLimited parallelism beyond default Keras options (except Trial parallelism, Data parallelism only suitable for multiple GPUs)"
+  },
+  {
     "objectID": "slides.html#wrong-baseline-comparison-fixed",
     "href": "slides.html#wrong-baseline-comparison-fixed",
     "title": "PicoCal Autoencoder",
     "section": "Wrong baseline comparison (fixed)",
-    "text": "Wrong baseline comparison (fixed)\nInitially, the quantized model was asked to reconstruct unquantized inputs; this implicitly asks it to “undo” input quantization too.\nTODO: show the previous code for quantized model and focus on the line with activation before the model\nFix: Quantize the inputs (data) prior to training so both models see consistent quantization."
+    "text": "Wrong baseline comparison (fixed)\n\nInitially, the quantized model was asked to reconstruct unquantized inputs; this implicitly asks it to “undo” input quantization too.\n\nquant_size = 8, int_size = 3\n\ninput_layer = layers.Input(shape=(32,), name=\"input_layer\")\nquantized_input = QActivation(f'quantized_bits(10,3,0,alpha=1)')(input_layer)\nencoded_output = QDense(\n    2,\n    kernel_quantizer=f'quantized_bits({quant_size},{int_size},1,alpha=1)',\n    bias_quantizer=f'quantized_bits({quant_size},{int_size},1,alpha=1)',\n    name=\"encoded\"\n)(input_layer)\nencoded_output = QActivation(\n    f'quantized_relu({quant_size},{int_size},0)', \n    name=\"encoded_act\"\n)(encoded_output)\n\nFix: Quantize the inputs (data) prior to training so both models see consistent quantization."
   },
   {
     "objectID": "slides.html#dying-relu-diagnosis-fixed",
@@ -26,5 +26,19 @@
     "title": "PicoCal Autoencoder",
     "section": "“dying ReLU” diagnosis (fixed)",
     "text": "“dying ReLU” diagnosis (fixed)\nIntermittent failures (~1/3 runs).\nEven after fixing the inputs, about one-third of runs failed to learn. Inspection of weights and biases showed nothing obviously wrong, yet parameter updates were tiny or stagnant across batches/epochs. Probing intermediate layer outputs revealed the network was producing near-constant outputs, and, crucially, the encoder ReLU had a very high (sometimes ~100%) probability of outputting zero on one or both latent units."
+  },
+  {
+    "objectID": "slides.html#baseline-model-trained-with-reinitialization",
+    "href": "slides.html#baseline-model-trained-with-reinitialization",
+    "title": "PicoCal Autoencoder",
+    "section": "Baseline model trained with reinitialization",
+    "text": "Baseline model trained with reinitialization"
+  },
+  {
+    "objectID": "slides.html#random-models-bits4",
+    "href": "slides.html#random-models-bits4",
+    "title": "PicoCal Autoencoder",
+    "section": "6 Random Models (bits=4)",
+    "text": "6 Random Models (bits=4)"
   }
 ]
