@@ -7,6 +7,20 @@
     "text": "What I am going to do\nOptimize the model via quantization, focusing on the encoder."
   },
   {
+    "objectID": "slides.html#what-has-been-changed-about-my-project",
+    "href": "slides.html#what-has-been-changed-about-my-project",
+    "title": "PicoCal Autoencoder",
+    "section": "What has been changed about my project",
+    "text": "What has been changed about my project\n\nOur planned radiation hardening study (separate project) has been postponed because:\n\nUncertainty: The specific effects of radiation on the hardware are still under investigation, so we lack a clear fault model to design for.\nCurrent Efficiency: Our hardware implementation is so resource-efficient that traditional Triple Modular Redundancy (TMR) is now a simple and viable solution, making a complex study less urgent.\n\n➡️ Therefore, our focus has shifted toward the model quantization project."
+  },
+  {
+    "objectID": "slides.html#quantization-strategy-mixed-precision-qat",
+    "href": "slides.html#quantization-strategy-mixed-precision-qat",
+    "title": "PicoCal Autoencoder",
+    "section": "Quantization Strategy: Mixed-precision QAT",
+    "text": "Quantization Strategy: Mixed-precision QAT\n\n\nWhy QAT?\n\nSmall model → can retrain multiple times\nAvoids accuracy loss from post-training quantization\n\nGranularity Choice\n\nFew parameters → finer granularity is better\nIdeal: Weight-wise mixed-precision (HGQ2 - High Granularity Quantization 2)\nCurrent: Layer-wise quantization (QKeras)\n\nImplementation\n\nNow: QKeras + hls4ml (layer-wise)\n\nStable support for Microchip radiation-hardened FPGA\n\nFuture: Migrate to HGQ2 (weight-wise)\n\nMicrochip FPGA support recently added but not production-ready"
+  },
+  {
     "objectID": "slides.html#why-im-not-using-autoqkeras",
     "href": "slides.html#why-im-not-using-autoqkeras",
     "title": "PicoCal Autoencoder",
@@ -18,7 +32,7 @@
     "href": "slides.html#wrong-baseline-comparison-fixed",
     "title": "PicoCal Autoencoder",
     "section": "Wrong baseline comparison (fixed)",
-    "text": "Wrong baseline comparison (fixed)\n\nInitially, the quantized model was asked to reconstruct unquantized inputs; this implicitly asks it to “undo” input quantization too.\n\nquant_size = 8, int_size = 3\n\ninput_layer = layers.Input(shape=(32,), name=\"input_layer\")\nquantized_input = QActivation(f'quantized_bits(10,3,0,alpha=1)')(input_layer)\nencoded_output = QDense(\n    2,\n    kernel_quantizer=f'quantized_bits({quant_size},{int_size},1,alpha=1)',\n    bias_quantizer=f'quantized_bits({quant_size},{int_size},1,alpha=1)',\n    name=\"encoded\"\n)(input_layer)\nencoded_output = QActivation(\n    f'quantized_relu({quant_size},{int_size},0)', \n    name=\"encoded_act\"\n)(encoded_output)\n\nFix: Quantize the inputs (data) prior to training so both models see consistent quantization."
+    "text": "Wrong baseline comparison (fixed)\n\nInitially, the quantized model was asked to reconstruct unquantized labes from it’s quantized inputs; this implicitly asks it to reverse quantization function too.\n\nquant_size = 8, int_size = 3\n\ninput_layer = layers.Input(shape=(32,), name=\"input_layer\")\nquantized_input = QActivation(f'quantized_bits(10,3,0,alpha=1)')(input_layer)\nencoded_output = QDense(\n    2,\n    kernel_quantizer=f'quantized_bits({quant_size},{int_size},1,alpha=1)',\n    bias_quantizer=f'quantized_bits({quant_size},{int_size},1,alpha=1)',\n    name=\"encoded\"\n)(input_layer)\nencoded_output = QActivation(\n    f'quantized_relu({quant_size},{int_size},0)', \n    name=\"encoded_act\"\n)(encoded_output)\n\nFix: Quantize the inputs (data) prior to training so both models see consistent quantization."
   },
   {
     "objectID": "slides.html#dying-relu-diagnosis-fixed",
@@ -28,11 +42,11 @@
     "text": "“dying ReLU” diagnosis (fixed)\nIntermittent failures (~1/3 runs).\nEven after fixing the inputs, about one-third of runs failed to learn. Inspection of weights and biases showed nothing obviously wrong, yet parameter updates were tiny or stagnant across batches/epochs. Probing intermediate layer outputs revealed the network was producing near-constant outputs, and, crucially, the encoder ReLU had a very high (sometimes ~100%) probability of outputting zero on one or both latent units."
   },
   {
-    "objectID": "slides.html#baseline-model-trained-with-reinitialization",
-    "href": "slides.html#baseline-model-trained-with-reinitialization",
+    "objectID": "slides.html#baseline-model-with-relu-activation-trained-with-reinitialization",
+    "href": "slides.html#baseline-model-with-relu-activation-trained-with-reinitialization",
     "title": "PicoCal Autoencoder",
-    "section": "Baseline model trained with reinitialization",
-    "text": "Baseline model trained with reinitialization"
+    "section": "Baseline model (with relu activation) trained with reinitialization",
+    "text": "Baseline model (with relu activation) trained with reinitialization\n\nSome models struggle to train initially due to the dying ReLU problem."
   },
   {
     "objectID": "slides.html#random-models-bits4",
