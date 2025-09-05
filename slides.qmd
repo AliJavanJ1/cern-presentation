@@ -132,14 +132,24 @@ Each pulse is first simulated with **1024 samples** (as in the actual test-beam 
 
 Optimize the model via **quantization**, focusing on the **encoder**.
 
-# Why we need quantize? <!--(confirm priorities with Katya???)-->
+## What has been changed about my project
+::: {.slide style="font-size:70%"}
+Our planned radiation hardening study (separate project) has been postponed because:
+
+- **Uncertainty**: The specific effects of radiation on the hardware are still under investigation, so we lack a clear fault model to design for.
+- **Current Efficiency**: Our hardware implementation is so resource-efficient that traditional Triple Modular Redundancy (TMR) is now a simple and viable solution, making a complex study less urgent.
+
+➡️ Therefore, our focus has shifted toward the model quantization project.
+:::
+
+# Why we should quantize?
 
 ::: {.slide style="font-size:95%"}
 - **Smaller & cheaper:** fewer bits → less bandwidth per pulse.
 - **Faster & lower latency:** fixed-point arithmetic is hardware-friendly.
 - **Lower power:** critical for on-detector operation.
 - **Smaller output payload:** compressed latent space uses fewer bits per value.
-- **Free of charges:** with **QAT** ^[Quantization Aware Training (explained in the next slide)], We can recover most or all of the accuracy lost to quantization.
+- **All previous benefits are free:** with **QAT** ^[Quantization Aware Training (explained in the next slide)], We can recover most or all of the accuracy lost to quantization.
 :::
 
 #
@@ -148,30 +158,43 @@ Optimize the model via **quantization**, focusing on the **encoder**.
 
 ### Quantization granularities
 
-| Option                                 | Definition                                                                                                    | Pros                                                                                | Costs / Trade-offs                                                                     | Typical use                                                                                                                                                                               |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Homogeneous**                        | One bit-width for **all** weights & activations across the model (e.g., all INT8).                            | Simple, fast to deploy; widely supported; easy to calibrate.                        | May leave accuracy on the table; no layer-specific tuning.                             | First pass; production baselines; strict simplicity/latency targets.                                                                                                                      |
-| **Mixed-precision (layer/group-wise)** | Choose bit-width **per layer** or **per group of layers** (e.g., encoder vs. decoder; early/mid/late blocks). | Strong accuracy–resource trade with modest complexity; aligns with runtime support. | Requires profiling/tuning; slightly more complex conversion.                           | FPGAs/ASICs (e.g., QKeras+hls4ml); mobile/edge where certain layers bottleneck.                                                                                                           |
-| **Mixed-precision (per-weight-wise)**  | Bit-width varies **within a layer** (per channel/filter or even per individual weight).                       | Finest control; can hit tight resource/accuracy targets; great for LUT/DSP packing. | High implementation complexity; limited framework/kernel support; harder verification. | **Hardware compilation flows (FPGA/ASIC)**—like those commonly used at **CERN** for on-detector/trigger systems; bit-serial or weight-streaming architectures; research/ASIC prototyping. |
+| Option                                 | Definition                                                                                                                   | Pros                                                                                    | Costs / Trade-offs                                                                         | Typical use                                                                                                                                                                                       |
+|----------------------------------------|------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Homogeneous**                        | One bit-width for **all** weights & activations across the model (e.g., all INT8).                                           | Simple, fast to deploy; widely supported; easy to calibrate.                            | May leave accuracy on the table; no layer-specific tuning.                                 | First pass; production baselines; strict simplicity/latency targets.                                                                                                                              |
+| **Mixed-precision (layer/group-wise)** | Choose bit-width **per layer** or **per group of layers**<br/>(e.g., encoder vs. decoder; early/mid/late blocks).            | Strong accuracy–resource trade with modest complexity;<br/>aligns with runtime support. | Requires profiling/tuning;<br/>slightly more complex conversion.                           | FPGAs/ASICs (e.g., QKeras+hls4ml);<br/>mobile/edge where certain layers bottleneck.                                                                                                               |
+| **Mixed-precision (per-weight-wise)**  | Bit-width varies **within a layer**<br/>(per channel/filter or even per individual weight).                                  | Finest control; can hit tight resource/accuracy targets;<br/>great for LUT/DSP packing. | High implementation complexity; limited framework/kernel support;<br/>harder verification. | **Hardware compilation flows (FPGA/ASIC)**—like those commonly used at **CERN** for on-detector/trigger systems;<br/>bit-serial or weight-streaming architectures;<br/>research/ASIC prototyping. |
 
 
 ### Quantization approaches
 
-| Approach          | What it does                                                | Accuracy impact                                            | Speed/Memory win                         | Typical use                            |
-| ----------------- | ----------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------- | -------------------------------------- |
-| **PTQ (static)**  | Calibrate once; bake fixed activation scales/zero-points.   | Low→moderate (strong at INT8; riskier ≤4-bit)              | 3–4× smaller; fast INT kernels           | Quick deploy w/ small calibration set. |
-| **PTQ (dynamic)** | Weights quantized; activation scales computed at inference. | Similar to static at INT8; worse ≤4-bit                    | Memory win; modest speedup               | CPU/NLP, no calibration set.           |
-| **QAT**           | Train with fake-quant so model learns quant noise.          | Best (often matches FP at INT8; workable ≤4-bit with care) | Same runtime as PTQ; extra training cost | Edge/FPGA/ASIC; tight accuracy.        |
-| **WOQ**           | Quantize weights only (e.g., 4-bit); activations FP8/FP16.  | Small→moderate                                             | Big memory/BW savings                    | Large LLM/CV on GPUs.                  |
+| Approach          | What it does                                                     | Accuracy impact                                                 | Speed/Memory win                         | Typical use                            |
+| ----------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------- | -------------------------------------- |
+| **PTQ (static)**  | Calibrate once; bake fixed activation scales/zero-points.        | Low→moderate (strong at INT8; riskier ≤4-bit)                   | 3–4× smaller; fast INT kernels           | Quick deploy w/ small calibration set. |
+| **PTQ (dynamic)** | Weights quantized; activation scales computed at inference.      | Similar to static at INT8; worse ≤4-bit                         | Memory win; modest speedup               | CPU/NLP, no calibration set.           |
+| **QAT**           | Train with fake-quant so model learns quant noise.               | Best (often matches FP at INT8; workable ≤4-bit with care)      | Same runtime as PTQ; extra training cost | Edge/FPGA/ASIC; tight accuracy.        |
+| **WOQ**           | Quantize weights only (e.g., 4-bit); activations FP8/FP16.       | Small→moderate                                                  | Big memory/BW savings                    | Large LLM/CV on GPUs.                  |
 
 
 :::
 
----
+## Quantization Strategy: Mixed-precision QAT
 
-Our plan: **Mixed-precision QAT** for the encoder. (using **QKeras + hls4ml**)
+::: {.slide style="font-size:60%"}
+- **Why QAT?**
+    - Small model → can retrain multiple times
+    - Avoids accuracy loss from post-training quantization
+- **Granularity Choice**
+    - Few parameters → finer granularity is better
+    - **Ideal**: Weight-wise mixed-precision (HGQ2 - High Granularity Quantization 2)
+    - **Current**: Layer-wise quantization (QKeras)
+- **Implementation**
+    - **Now**: QKeras + hls4ml (layer-wise)
+        - Stable support for Microchip radiation-hardened FPGA
+    - **Future**: Migrate to HGQ2 (weight-wise)
+        - Microchip FPGA support recently added but not production-ready
+:::
 
-# QKeras [@Coelho2020UltraLL] + hls4ml [@fahim2021hls4mlopensourcecodesignworkflow] + (AutoQKeras [@Coelho_2021])
+# QKeras [@Coelho2020UltraLL] + hls4ml [@fahim2021hls4mlopensourcecodesignworkflow] + ~~(AutoQKeras [@Coelho_2021])~~
 
 **QKeras is** a drop-in extension of Keras that lets you assign **per-layer** (heterogeneous) quantization to weights, activations, and batch-norm parameters and train the model **quantization-aware**. Combined with **hls4ml**, quantized networks are compiled to FPGA firmware for **O(10) ns** inference.
 
@@ -200,12 +223,13 @@ Our plan: **Mixed-precision QAT** for the encoder. (using **QKeras + hls4ml**)
 
 *Note:* I plan to create a short **notebook/markdown guide** for a reproducible QKeras setup (including CERN cluster tips), given the current documentation gaps and the fact that it took a lot of time on setting up a working environment for me.
 
-# Quantization work so far — issues and fixes
+# Quantization work so far {style="font-size:140%"}
+
 
 ## Wrong baseline comparison (fixed)
 
 ::: {.slide style="font-size:70%"}
-Initially, the quantized model was asked to reconstruct **unquantized** inputs; this implicitly asks it to “undo” input quantization too.
+Initially, the quantized model was asked to reconstruct **unquantized** labes from it's quantized inputs; this implicitly asks it to reverse quantization function too.
 :::
 
 ```{.python code-line-numbers="|3-4"}
@@ -265,9 +289,9 @@ The **only change that consistently fixed the problem** was **replacing ReLU wit
 
 I also implemented a **callback** to detect dying behavior (monitoring **zero-output ratio** and **learning stalls**) and to **reinitialize**. However, reinitializing **layers/activations/callbacks/epochs mid-training** made the code overly complex. Instead, I adopted a simpler **restart policy** triggered by **high validation loss**, which works well in practice.
 
-## Baseline model trained with reinitialization
+## Baseline model (with relu activation) trained with reinitialization
 
-![](assets/images/base-mode-training-with-restart.png)
+![Some models struggle to train initially due to the **dying ReLU** problem.](assets/images/base-mode-training-with-restart.png)
 
 # Variance across runs and K-Fold cross-validation
 
@@ -295,7 +319,7 @@ The **std** of the **minimum validation loss** was high (≈ half the mean). To 
 
 ---
 
-![](assets/images/basemodel-weight-bias-inspect.png)
+![This chart shows the average data loss per weight or bias when applying PTQ, with our baseline model accuracy at approximately 0.0006](assets/images/basemodel-weight-bias-inspect.png)
 
 ---
 
@@ -642,7 +666,7 @@ fig.show()
 
 **Implication for production:** choose a reasonable configuration and **rerun with new initializations** until the desired metric is achieved. Under this regime, we can also quantize the encoder activation more aggressively.
 
-# Recommendations to the new QKeras replacing of CERN (developer feedback)
+# Recommendations to the new QKeras replacing of CERN - HGQ2 (developer feedback)
 
 ::: {.slide style="font-size:70%"}
 - Add **LeakyReLU-family** activations support; they help both small and large models and drastically reduce dead-unit risk.
@@ -650,6 +674,10 @@ fig.show()
 - Move away from **string-based** quantizer specs; adopt Pythonic APIs (with deprecation warnings).
 - Consider **drop-in PyTorch-layer equivalents** for broader adoption.
 :::
+
+# Final reconstructions from test data
+
+![**Alt+click** to zoom in on elements (**CTRL+click** in Linux)](assets/images/test-results.png)
 
 # Summary
 
@@ -668,5 +696,6 @@ fig.show()
 
 # Send Regards 
 
-It was my first time in Europe, and I really liked it here. I had a great time at CERN—the environment was very friendly.  
-Huge thanks to everyone who makes this summer program possible—you’re doing a really great thing here.
+This was my first time in Europe, and I absolutely loved the experience. My time at CERN was truly exceptional—the collaborative environment and welcoming atmosphere made it unforgettable.
+
+I'm deeply grateful to everyone who makes this summer program possible. The impact you're creating by providing these opportunities to students is remarkable, and I feel fortunate to have been part of it.
